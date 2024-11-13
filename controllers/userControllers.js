@@ -3,10 +3,12 @@ const otpModel = require("../models/otpModel");
 const generateOTP = require("../utils/otpGenerator");
 const jwt = require('jsonwebtoken')
 const cookieParser = require('cookie-parser');
+const { OAuth2Client } = require('google-auth-library');
 const ACCESS_TOKEN_SECRET = '343SS$@#@#@#@ '
 const REFRESH_TOKEN_SECRET = "1212121Asadas4"
 const ACCESS_TOKEN_EXPIRY = '15m';
 const REFRESH_TOKEN_EXPIRY = '7d';
+
 const signup = async (req, res) => {
  
   try {
@@ -171,4 +173,32 @@ const refreshtoken = (req,res) =>
   
 
 }
-module.exports = { signup, signIn, verifyotp, resendOtp,refreshtoken };
+const googleauth = async(req,res) =>
+{
+  try {
+    const { token } = req.body;
+    const client = new OAuth2Client(
+      "438928102493-t30q3fikvgjjmooufofj9ofu41un751p.apps.googleusercontent.com"
+    );
+    const ticket = await client.verifyIdToken({idToken:token,audience: "438928102493-t30q3fikvgjjmooufofj9ofu41un751p.apps.googleusercontent.com"})
+    const data = ticket.getPayload()
+    if(!data)
+    {
+      return res.json({message:"invalid google login"})
+    }
+    const newUser = await usermodel({
+      fullname: data.given_name,
+         email_or_phono: data.email,
+        
+         role: "normal",
+         verify: false,
+       });
+       const access_token = jwt.sign({email_or_phono:data.email }, ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
+       const refreshToken = jwt.sign({ email_or_phono:data.email_or_phono }, REFRESH_TOKEN_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY });
+       res.cookie('accessToken', access_token, { httpOnly: true, secure: true });
+         res.json({refreshtoken:refreshToken})
+  } catch (error) {
+    
+  }
+}
+module.exports = { signup, signIn, verifyotp, resendOtp,refreshtoken ,googleauth};
