@@ -1,7 +1,12 @@
 const usermodel = require("../models/userModel");
 const otpModel = require("../models/otpModel");
 const generateOTP = require("../utils/otpGenerator");
-const { FcExpired } = require("react-icons/fc");
+const jwt = require('jsonwebtoken')
+const cookieParser = require('cookie-parser');
+const ACCESS_TOKEN_SECRET = '343SS$@#@#@#@ '
+const REFRESH_TOKEN_SECRET = "1212121Asadas4"
+const ACCESS_TOKEN_EXPIRY = '15m';
+const REFRESH_TOKEN_EXPIRY = '7d';
 const signup = async (req, res) => {
  
   try {
@@ -68,7 +73,16 @@ const signIn = async (req, res) => {
     return res.json({ message: "user not found" });
   }
   if (user.password == password) {
-    return res.json({ message: "welcome" });
+    const accessToken = jwt.sign({ email_or_phono:user.email_or_phono}, ACCESS_TOKEN_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
+    const refreshToken = jwt.sign({ email_or_phono:user.email_or_phono }, REFRESH_TOKEN_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY });
+  
+    res.cookie('access_token', accessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      maxAge: 15 * 60 * 1000 
+    });
+    return res.json({ message: "welcome",refreshToken:refreshToken });
   }
   return res.json({ message: "your password  is incorrext" });
 };
@@ -124,4 +138,37 @@ const resendOtp = async (req, res) => {
   }
 };
 
-module.exports = { signup, signIn, verifyotp, resendOtp };
+
+const refreshtoken = (req,res) =>
+{
+  const { refreshToken ,email_or_phono} = req.body;
+  console.log(refreshToken)
+  if(!refreshToken || !email_or_phono )
+  {
+    return res.json({message:"all fields required"})
+  }
+     jwt.verify(refreshToken,REFRESH_TOKEN_SECRET ,(err,user) =>
+    {
+      if(err)
+      {
+        return res.json({message:"Invalid tokken"})
+      }
+      else
+      {
+         const accessToken = jwt.sign({email_or_phono:email_or_phono},ACCESS_TOKEN_SECRET, {
+          expiresIn: ACCESS_TOKEN_EXPIRY}
+        )
+
+        res.cookie('access_token', accessToken, {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'strict',
+          maxAge: 15 * 60 * 1000 
+        });
+        res.json({ message: 'Access token refreshed' })
+      }
+    } )
+  
+
+}
+module.exports = { signup, signIn, verifyotp, resendOtp,refreshtoken };
